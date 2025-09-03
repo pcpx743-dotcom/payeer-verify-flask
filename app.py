@@ -3,7 +3,7 @@ import os
 
 app = Flask(__name__)
 
-TOKEN = "payeer_2256138605"
+TOKEN = "2256138605"
 FILENAME = "payeer_2256138605.txt"
 
 @app.get("/")
@@ -17,5 +17,6 @@ def verify():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Render PORT muhit o'zgaruvchisini oladi
     app.run(host="0.0.0.0", port=port)
+
 
 
