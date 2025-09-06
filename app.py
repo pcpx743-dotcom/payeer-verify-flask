@@ -1,47 +1,54 @@
+# --- ADD/REPLACE in app.py ---
 import os, uuid, hashlib, hmac
 from flask import Flask, render_template_string, request, abort
 
 app = Flask(__name__)
 
 EPC_MERCHANT_ID = "103045"
-EPC_SECRET      = "yrGW2mWFLDjzTpbD"  # SCI/Seller secret (kabinetdagi)
+EPC_SECRET      = "yrGW2mWFLDjzTpbD"
 ACTION_URL      = "https://api.epaycore.com/checkout/form"
 
-SUCCESS_URL = "https://payeer-verify-flask.onrender.com/success"
-CANCEL_URL  = "https://payeer-verify-flask.onrender.com/fail"
-STATUS_URL  = "https://payeer-verify-flask.onrender.com/api/epaycore/webhook"
+SUCCESS_URL = os.getenv("SUCCESS_URL", "https://payeer-verify-flask.onrender.com/success")
+CANCEL_URL  = os.getenv("FAIL_URL",    "https://payeer-verify-flask.onrender.com/fail")
+STATUS_URL  = os.getenv("CALLBACK_URL","https://payeer-verify-flask.onrender.com/api/epaycore/webhook")
 
 def sign_md5(amount, currency_code, order_id, merchant_id, secret):
     raw = f"{amount}:{currency_code}:{order_id}:{merchant_id}:{secret}"
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.md5(raw.encode()).hexdigest(), raw
 
 def sign_hmac_sha256(amount, currency_code, order_id, merchant_id, secret):
     raw = f"epc_amount={amount}&epc_currency_code={currency_code}&epc_order_id={order_id}&epc_merchant_id={merchant_id}"
-    return hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest(), raw
 
 @app.get("/pay/<amount>")
 def pay(amount):
+    algo = (request.args.get("algo") or "md5").lower()   # md5 | sha256
     order_id = "ORD-" + uuid.uuid4().hex[:10].upper()
     amt = f"{float(amount):.2f}"
+    currency_code = "USD"
 
-    # SIGN – docs’dagi formulaga moslang!
-    sign = hashlib.md5(f"{amt}:USD:{order_id}:103045:{EPC_SECRET}".encode()).hexdigest()
+    if algo == "sha256":
+        epc_sign, raw = sign_hmac_sha256(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
+    else:
+        epc_sign, raw = sign_md5(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
 
     fields = {
-        "epc_merchant_id":  "103045",
-        "epc_commission":   "1",
-        "epc_amount":       amt,
-        "epc_currency_code": "USD",
-        "epc_order_id":     order_id,
-        "epc_success_url":  SUCCESS_URL,
-        "epc_cancel_url":   CANCEL_URL,
-        "epc_status_url":   STATUS_URL,
-        "epc_sign":         sign,
+        "epc_merchant_id":   EPC_MERCHANT_ID,
+        "epc_commission":    "1",           # Customer pays fee
+        "epc_amount":        amt,
+        "epc_currency_code": currency_code,
+        "epc_order_id":      order_id,
+        "epc_success_url":   SUCCESS_URL,
+        "epc_cancel_url":    CANCEL_URL,
+        "epc_status_url":    STATUS_URL,
+        "epc_sign":          epc_sign,
     }
 
     html = f"""
-    <html><body onload="document.forms[0].submit()">
-      <form method="post" action="https://api.epaycore.com/checkout/form">
+    <html><body onload="document.forms[0].submit()" style="font-family:sans-serif;padding:16px">
+      <h3>Redirecting to ePayCore checkout…</h3>
+      <p>algo: {algo} | sign: {epc_sign} | raw: {raw}</p>
+      <form method="post" action="{ACTION_URL}">
         {''.join(f'<input type="hidden" name="{k}" value="{v}"/>' for k,v in fields.items())}
         <noscript><button type="submit">Continue</button></noscript>
       </form>
@@ -49,29 +56,17 @@ def pay(amount):
     """
     return render_template_string(html)
 
-
-@app.post("/api/epaycore/webhook")
-def webhook():
-    data = request.form.to_dict() or (request.get_json(silent=True) or {})
-    # Tipik maydonlar: epc_order_id, epc_amount, epc_currency_code, epc_status, epc_sign, ...
-    need = ["epc_order_id","epc_amount","epc_currency_code","epc_status","epc_sign","epc_merchant_id"]
-    if not all(k in data for k in need):
-        return abort(400, f"missing fields: {need}")
-
-    # SIGN tekshirish — docs’dagi formula bilan BIR XIL bo‘lishi shart:
-    expected = sign_md5(data["epc_amount"], data["epc_currency_code"], data["epc_order_id"], data["epc_merchant_id"], EPC_SECRET)
-    # expected = sign_hmac_sha256(data["epc_amount"], data["epc_currency_code"], data["epc_order_id"], data["epc_merchant_id"], EPC_SECRET)
-
-    if data["epc_sign"] != expected:
-        return abort(403, "bad sign")
-
-    if data["epc_status"].lower() == "success":  # yoki 'paid' — docsdagi aniq qiymatga qarab
-        # TODO: orderni paid qilish
-        pass
-
-    return "OK"
-
-@app.get("/")
-def index():
-    return "OK"
+@app.get("/sign-preview")
+def sign_preview():
+    # Tez tekshiruv: siz kiritgan order_id/amount bilan sign satrini ko'rish
+    amt = request.args.get("amount","9.99")
+    order_id = request.args.get("order_id","ORD-PREVIEW")
+    currency = request.args.get("currency","USD").upper()
+    m5, raw_m5 = sign_md5(amt, currency, order_id, EPC_MERCHANT_ID, EPC_SECRET)
+    s256, raw_s256 = sign_hmac_sha256(amt, currency, order_id, EPC_MERCHANT_ID, EPC_SECRET)
+    return {
+        "md5": {"raw": raw_m5, "sign": m5},
+        "sha256": {"raw": raw_s256, "sign": s256},
+        "used": {"merchant": EPC_MERCHANT_ID, "secret_present": bool(EPC_SECRET)}
+    }
 
