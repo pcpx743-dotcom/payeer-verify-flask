@@ -9,7 +9,7 @@ app = Flask(__name__)
 SCI_MERCHANT  = os.getenv("SCI_MERCHANT")
 SCI_NAME      = os.getenv("SCI_NAME")
 SCI_PASSWORD  = os.getenv("SCI_PASSWORD")
-SCI_ACTION    = os.getenv("SCI_ACTION_URL", "https://pay.epaycore.com/sci").rstrip("/")
+SCI_ACTION    = os.getenv("SCI_ACTION_URL", "https://api.epaycore.com/checkout/form").rstrip("/")
 SIGN_ALGO     = (os.getenv("SCI_SIGN_ALGO") or "md5").lower()
 
 SUCCESS_URL   = os.getenv("SUCCESS_URL")
@@ -151,6 +151,7 @@ def epaycore_webhook():
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
 
