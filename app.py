@@ -6,6 +6,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
+EPC_MERCHANT_ID = "103045"
 SCI_MERCHANT  = os.getenv("SCI_MERCHANT")
 SCI_NAME      = os.getenv("SCI_NAME")
 SCI_PASSWORD  = os.getenv("SCI_PASSWORD")
@@ -151,6 +152,7 @@ def epaycore_webhook():
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
 
