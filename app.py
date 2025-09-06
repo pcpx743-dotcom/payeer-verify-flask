@@ -17,9 +17,11 @@ def sign_md5(amount, currency_code, order_id, merchant_id, secret):
     raw = f"{amount}:{currency_code}:{order_id}:{merchant_id}:{secret}"
     return hashlib.md5(raw.encode()).hexdigest(), raw
 
-def sign_hmac_sha256(amount, currency_code, order_id, merchant_id, secret):
-    raw = f"epc_amount={amount}&epc_currency_code={currency_code}&epc_order_id={order_id}&epc_merchant_id={merchant_id}"
-    return hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest(), raw
+
+def sign_hmac_sha256(merchant_id: str, amount: str, currency_code: str, order_id: str, password: str) -> str:
+    # EXACT formula: merchant_id:amount:currency:order_id:password  → sha256 hex (64)
+    raw = f"{merchant_id}:{amount}:{currency_code}:{order_id}:{password}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest(), raw
 
 @app.get("/pay/<amount>")
 def pay(amount):
@@ -74,4 +76,5 @@ def sign_preview():
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
