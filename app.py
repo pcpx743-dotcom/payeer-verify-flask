@@ -21,37 +21,34 @@ def sign_hmac_sha256(amount, currency_code, order_id, merchant_id, secret):
 
 @app.get("/pay/<amount>")
 def pay(amount):
-    # Buyurtma
     order_id = "ORD-" + uuid.uuid4().hex[:10].upper()
     amt = f"{float(amount):.2f}"
-    currency_code = "USD"
 
-    # --- SIGN: docs’dagi FORMULAGA mosini TANLANG ---
-    epc_sign = sign_md5(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
-    # epc_sign = sign_hmac_sha256(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
+    # SIGN – docs’dagi formulaga moslang!
+    sign = hashlib.md5(f"{amt}:USD:{order_id}:103045:{EPC_SECRET}".encode()).hexdigest()
 
     fields = {
-        "epc_merchant_id":  EPC_MERCHANT_ID,
-        "epc_commission":   "1",         # 1 = Customer pays fee (siz shuni tanlagansiz)
+        "epc_merchant_id":  "103045",
+        "epc_commission":   "1",
         "epc_amount":       amt,
-        "epc_currency_code": currency_code,
+        "epc_currency_code": "USD",
         "epc_order_id":     order_id,
         "epc_success_url":  SUCCESS_URL,
         "epc_cancel_url":   CANCEL_URL,
         "epc_status_url":   STATUS_URL,
-        "epc_sign":         epc_sign,
+        "epc_sign":         sign,
     }
 
     html = f"""
     <html><body onload="document.forms[0].submit()">
-      <h3>Redirecting to ePayCore checkout…</h3>
-      <form method="post" action="{ACTION_URL}">
+      <form method="post" action="https://api.epaycore.com/checkout/form">
         {''.join(f'<input type="hidden" name="{k}" value="{v}"/>' for k,v in fields.items())}
         <noscript><button type="submit">Continue</button></noscript>
       </form>
     </body></html>
     """
     return render_template_string(html)
+
 
 @app.post("/api/epaycore/webhook")
 def webhook():
@@ -77,3 +74,4 @@ def webhook():
 @app.get("/")
 def index():
     return "OK"
+
