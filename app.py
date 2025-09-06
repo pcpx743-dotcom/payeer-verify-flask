@@ -5,7 +5,7 @@ from flask import Flask, render_template_string, request, abort
 
 app = Flask(__name__)
 
-EPC_MERCHANT_ID = "103045"
+EPC_MERCHANT_ID = "104375"
 EPC_SECRET      = "yrGW2mWFLDjzTpbD"
 ACTION_URL      = "https://api.epaycore.com/checkout/form"
 
@@ -74,3 +74,4 @@ def sign_preview():
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
