@@ -1,3 +1,4 @@
+
 # --- ADD/REPLACE in app.py ---
 import os, uuid, hashlib, hmac
 from flask import Flask, render_template_string, request, abort
@@ -70,3 +71,6 @@ def sign_preview():
         "used": {"merchant": EPC_MERCHANT_ID, "secret_present": bool(EPC_SECRET)}
     }
 
+if __name__ == "__main__":
+    import os
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
