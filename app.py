@@ -23,6 +23,11 @@ def sign_hmac_sha256(merchant_id: str, amount: str, currency_code: str, order_id
     raw = f"{merchant_id}:{amount}:{currency_code}:{order_id}:{password}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest(), raw
 
+def make_epc_sign(merchant_id: str, amount: str, currency_code: str, order_id: str, password: str) -> str:
+    # EXACT formula: merchant_id:amount:currency:order_id:password  → sha256 hex (64)
+    raw = f"{merchant_id}:{amount}:{currency_code}:{order_id}:{password}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest(), raw
+    
 @app.get("/pay/<amount>")
 def pay(amount):
     algo = (request.args.get("algo") or "md5").lower()   # md5 | sha256
@@ -30,10 +35,7 @@ def pay(amount):
     amt = f"{float(amount):.2f}"
     currency_code = "USD"
 
-    if algo == "sha256":
-        epc_sign, raw = sign_hmac_sha256(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
-    else:
-        epc_sign, raw = sign_md5(amt, currency_code, order_id, EPC_MERCHANT_ID, EPC_SECRET)
+    epc_sign, raw = make_epc_sign(EPC_MERCHANT_ID, amt, currency_code, order_id, EPC_SECRET)
 
     fields = {
         "epc_merchant_id":   EPC_MERCHANT_ID,
@@ -76,5 +78,6 @@ def sign_preview():
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
